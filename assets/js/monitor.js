@@ -4,164 +4,108 @@ let chartsInstances = {};
 
 document.addEventListener('DOMContentLoaded', () => {
     initMonitor();
-    // Refresco cada 2 segundos
-    setInterval(updateMonitor, 2000);
+    setInterval(updateMonitor, 2000); // Tasa de refresco 2 segundos
 });
 
 async function initMonitor() {
     await updateMonitor();
-    const indicator = document.getElementById('liveIndicator');
-    if (indicator) {
-        indicator.classList.remove('bg-danger');
-        indicator.classList.add('bg-success');
-        indicator.innerText = "ONLINE";
-    }
+    document.getElementById('liveIndicator').className = "badge bg-success";
+    document.getElementById('liveIndicator').innerText = "ONLINE - Refrescando 2s";
 }
 
 async function updateMonitor() {
     try {
-        // CORRECCIÓN: Usamos headers para evitar el caché sin romper la URL de MockAPI
-        const requestOptions = {
-            method: 'GET',
-            headers: { 'Content-Type': 'application/json' },
-            cache: 'no-store' // Esto obliga al navegador a pedir datos nuevos siempre
-        };
+        const reqOpts = { method: 'GET', headers: { 'Content-Type': 'application/json' }, cache: 'no-store' };
+        const [devRes, telRes] = await Promise.all([ fetch(`${API_URL}/devices`, reqOpts), fetch(`${API_URL}/telemetry`, reqOpts) ]);
         
-        const [devicesRes, telemetryRes] = await Promise.all([
-            fetch(`${API_URL}/devices`, requestOptions),
-            fetch(`${API_URL}/telemetry`, requestOptions)
-        ]);
-        
-        if (!devicesRes.ok || !telemetryRes.ok) throw new Error("Error en la API");
+        const devices = Array.isArray(await devRes.json()) ? await devRes.json() : [];
+        const telemetry = Array.isArray(await telRes.json()) ? await telRes.json() : [];
 
-        const devices = await devicesRes.json();
-        const telemetry = await telemetryRes.json();
-
-        // Si MockAPI devuelve un string por error, intentamos parsearlo (seguridad extra)
-        const cleanDevices = Array.isArray(devices) ? devices : [];
-        const cleanTelemetry = Array.isArray(telemetry) ? telemetry : [];
-
-        renderCharts(cleanDevices, cleanTelemetry);
-        renderTable(cleanDevices, cleanTelemetry);
-
-    } catch (error) {
-        console.error("Error en monitoreo:", error);
-    }
+        renderCharts(devices, telemetry);
+        renderTableGrouped(devices, telemetry);
+    } catch (error) { console.error("Error API:", error); }
 }
 
 function renderCharts(devices, telemetry) {
     const container = document.getElementById('chartsContainer');
-
-    // Limpiar mensaje de carga inicial si existe
-    if (container.innerHTML.includes('Cargando')) {
-        container.innerHTML = '';
-    }
+    if (container.innerHTML.includes('Cargando')) container.innerHTML = '';
 
     devices.forEach(device => {
-        // Filtramos y ordenamos la telemetría
-        // Usamos '==' para que coincida ID texto ("1") con ID número (1)
-        const deviceData = telemetry
-            .filter(t => t.deviceId == device.id) 
-            .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)) // Orden Cronológico (antiguo -> nuevo)
-            .slice(-20); // Últimos 20 puntos para la gráfica
+        const hasVolume = ['Entretenimiento', 'Computo', 'Audio'].includes(device.type);
+        const deviceLogs = telemetry.filter(t => t.deviceId == device.id).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+        
+        const statusLogs = deviceLogs.filter(t => t.type === 'status' || !t.type).slice(-20);
+        const volumeLogs = deviceLogs.filter(t => t.type === 'volume').slice(-20);
 
-        const labels = deviceData.map(d => new Date(d.createdAt).toLocaleTimeString());
-        const dataPoints = deviceData.map(d => d.value);
+        const canvasStatusId = `chart-status-${device.id}`;
+        const canvasVolumeId = `chart-volume-${device.id}`;
 
-        const canvasId = `chart-${device.id}`;
+        if (!document.getElementById(`card-${device.id}`)) {
+            let chartsHtml = `<h6 class="text-white-50 mt-2 mb-1 small">Estado (ON/OFF)</h6><canvas id="${canvasStatusId}"></canvas>`;
+            if (hasVolume) chartsHtml += `<h6 class="text-white-50 mt-4 mb-1 small">Volumen (%)</h6><canvas id="${canvasVolumeId}"></canvas>`;
 
-        // Crear la tarjeta HTML si no existe
-        if (!document.getElementById(canvasId)) {
-            const html = `
-                <div class="col-md-6 col-lg-4">
+            container.innerHTML += `
+                <div class="col-md-6 col-lg-4" id="card-${device.id}">
                     <div class="glass-card p-3 h-100">
-                        <div class="d-flex align-items-center mb-3">
-                            <i class="bi ${device.icon} fs-4 me-2 text-neon"></i>
-                            <h5 class="text-white m-0">${device.name}</h5>
+                        <div class="d-flex align-items-center mb-2 border-bottom border-secondary pb-2">
+                            <i class="bi ${device.icon} fs-4 me-2 text-neon"></i><h5 class="text-white m-0">${device.name}</h5>
                         </div>
-                        <canvas id="${canvasId}"></canvas>
+                        ${chartsHtml}
                     </div>
-                </div>
-            `;
-            container.innerHTML += html;
+                </div>`;
         }
 
-        // Actualizar o Crear Gráfica
-        const ctx = document.getElementById(canvasId);
-        if (ctx) {
-            if (chartsInstances[device.id]) {
-                // Actualizar existente
-                chartsInstances[device.id].data.labels = labels;
-                chartsInstances[device.id].data.datasets[0].data = dataPoints;
-                chartsInstances[device.id].update('none'); // 'none' ahorra recursos en la animación
+        // Gráfica de Estado
+        const ctxStatus = document.getElementById(canvasStatusId);
+        if (ctxStatus) {
+            const dataStatus = statusLogs.map(d => d.value == 1 ? 1 : 0);
+            if (chartsInstances[canvasStatusId]) {
+                chartsInstances[canvasStatusId].data.labels = statusLogs.map(d => new Date(d.createdAt).toLocaleTimeString());
+                chartsInstances[canvasStatusId].data.datasets[0].data = dataStatus;
+                chartsInstances[canvasStatusId].update('none');
             } else {
-                // Crear nueva
-                chartsInstances[device.id] = new Chart(ctx, {
+                chartsInstances[canvasStatusId] = new Chart(ctxStatus, {
                     type: 'line',
-                    data: {
-                        labels: labels,
-                        datasets: [{
-                            label: 'Estado',
-                            data: dataPoints,
-                            borderColor: '#00d4ff',
-                            backgroundColor: 'rgba(0, 212, 255, 0.1)',
-                            borderWidth: 2,
-                            tension: 0.1, // Línea más recta para señales digitales
-                            fill: true,
-                            stepped: true // Importante para ver la señal cuadrada
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        animation: false, // Desactivar animación inicial para que se sienta más 'tiempo real'
-                        scales: {
-                            y: { 
-                                beginAtZero: true, 
-                                max: 1.5, // Dejar espacio arriba del 1
-                                ticks: { color: 'white', stepSize: 1 } 
-                            },
-                            x: { display: false }
-                        },
-                        plugins: { legend: { display: false } }
-                    }
+                    data: { labels: statusLogs.map(d => new Date(d.createdAt).toLocaleTimeString()), datasets: [{ label: 'Estado', data: dataStatus, borderColor: '#00ff88', backgroundColor: 'rgba(0, 255, 136, 0.1)', borderWidth: 2, tension: 0, stepped: true, fill: true }] },
+                    options: { responsive: true, animation: false, scales: { y: { min: 0, max: 1.2, ticks: { color: 'white', stepSize: 1, callback: v => v===1?'ON':(v===0?'OFF':'') } }, x: { display: false } }, plugins: { legend: { display: false } } }
+                });
+            }
+        }
+
+        // Gráfica de Volumen
+        if (hasVolume && document.getElementById(canvasVolumeId)) {
+            if (chartsInstances[canvasVolumeId]) {
+                chartsInstances[canvasVolumeId].data.labels = volumeLogs.map(d => new Date(d.createdAt).toLocaleTimeString());
+                chartsInstances[canvasVolumeId].data.datasets[0].data = volumeLogs.map(d => d.value);
+                chartsInstances[canvasVolumeId].update('none');
+            } else {
+                chartsInstances[canvasVolumeId] = new Chart(document.getElementById(canvasVolumeId), {
+                    type: 'line',
+                    data: { labels: volumeLogs.map(d => new Date(d.createdAt).toLocaleTimeString()), datasets: [{ label: 'Volumen', data: volumeLogs.map(d => d.value), borderColor: '#d400ff', backgroundColor: 'rgba(212, 0, 255, 0.1)', borderWidth: 2, tension: 0.4, fill: true }] },
+                    options: { responsive: true, animation: false, scales: { y: { min: 0, max: 100, ticks: { color: 'white' } }, x: { display: false } }, plugins: { legend: { display: false } } }
                 });
             }
         }
     });
 }
 
-function renderTable(devices, telemetry) {
+function renderTableGrouped(devices, telemetry) {
     const tbody = document.getElementById('historyTableBody');
     if (!tbody) return;
+    let html = '';
 
-    // Ordenamos INVERSO (Nuevo -> Antiguo) para la tabla
-    const last10 = [...telemetry] // Creamos una copia para no romper el orden de las gráficas
-        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-        .slice(0, 10);
-
-    // Si no ha cambiado la cantidad de filas y es el mismo primer dato, no redibujamos (optimización)
-    // Pero para asegurar que funcione, forzamos el redibujado:
-    tbody.innerHTML = '';
-
-    last10.forEach(log => {
-        const device = devices.find(d => d.id == log.deviceId);
-        const deviceName = device ? device.name : 'Desconocido';
-        const deviceIcon = device ? device.icon : 'bi-question';
-
-        const date = new Date(log.createdAt).toLocaleString();
-        
-        const statusBadge = log.value == 1 
-            ? '<span class="badge bg-success">ENCENDIDO</span>' 
-            : '<span class="badge bg-secondary">APAGADO</span>';
-
-        const row = `
-            <tr>
-                <td class="text-muted small">${date}</td>
-                <td><i class="bi ${deviceIcon}"></i> ${deviceName}</td>
-                <td>Switch</td>
-                <td>${statusBadge}</td>
-            </tr>
-        `;
-        tbody.innerHTML += row;
+    devices.forEach(device => {
+        const logs = telemetry.filter(t => t.deviceId == device.id).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 10);
+        logs.forEach(log => {
+            const isVol = log.type === 'volume';
+            html += `
+                <tr>
+                    <td class="text-start"><i class="bi ${device.icon} text-neon me-2"></i> ${device.name}</td>
+                    <td class="text-muted small">${new Date(log.createdAt).toLocaleString()}</td>
+                    <td>${isVol ? '<span class="text-warning"><i class="bi bi-volume-up"></i> Volumen</span>' : '<span class="text-info"><i class="bi bi-power"></i> Energía</span>'}</td>
+                    <td>${isVol ? `<span class="badge bg-dark border border-warning">${log.value}%</span>` : (log.value == 1 ? '<span class="badge bg-success">ON</span>' : '<span class="badge bg-secondary">OFF</span>')}</td>
+                </tr>`;
+        });
     });
+    tbody.innerHTML = html;
 }

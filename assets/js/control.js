@@ -1,10 +1,4 @@
-// js/control.js
-
-document.addEventListener('DOMContentLoaded', () => {
-    loadDevices();
-    // Refresco automático cada 5 segundos por si alguien cambia algo en otro lado
-    setInterval(loadDevices, 5000); 
-});
+document.addEventListener('DOMContentLoaded', loadDevices);
 
 async function loadDevices() {
     try {
@@ -12,78 +6,79 @@ async function loadDevices() {
         const devices = await response.json();
         renderDevices(devices);
     } catch (error) {
-        console.error("Error cargando dispositivos:", error);
+        console.error("Error al cargar dispositivos:", error);
     }
 }
 
 function renderDevices(devices) {
     const container = document.getElementById('devicesContainer');
-    
-    // Si ya hay tarjetas, solo actualizamos estados para no parpadear,
-    // pero para simplificar en este prototipo, limpiamos y redibujamos.
     container.innerHTML = ''; 
 
     devices.forEach(device => {
-        // Determinar si está encendido o apagado
         const isOn = device.status; 
         const statusClass = isOn ? 'device-on' : '';
-        const statusText = isOn ? 'ENCENDIDO' : 'APAGADO';
-        const statusColor = isOn ? 'text-success' : 'text-muted';
+        const volume = device.volume || 0; 
+        const hasVolume = ['Entretenimiento', 'Computo', 'Audio'].includes(device.type);
 
-        const cardHtml = `
+        let volumeHtml = '';
+        if (hasVolume) {
+            volumeHtml = `
+                <div class="mt-3 pt-3 border-top border-secondary">
+                    <label class="text-white-50 small mb-1"><i class="bi bi-volume-up"></i> Volumen: <span id="vol-${device.id}">${volume}</span>%</label>
+                    <input type="range" class="form-range" min="0" max="100" value="${volume}" 
+                        onchange="changeVolume('${device.id}', this.value)" ${!isOn ? 'disabled' : ''}>
+                </div>
+            `;
+        }
+
+        container.innerHTML += `
             <div class="col-md-4 col-sm-6">
-                <div class="glass-card device-card ${statusClass}" onclick="toggleDevice('${device.id}', ${isOn})">
-                    <div class="d-flex justify-content-between align-items-start mb-3">
-                        <span class="badge bg-dark bg-opacity-50 border border-secondary">${device.type}</span>
-                        <i class="bi bi-circle-fill ${isOn ? 'text-success' : 'text-danger'} small-indicator"></i>
+                <div class="glass-card device-card ${statusClass}">
+                    <div class="d-flex justify-content-between align-items-start mb-2" onclick="toggleDevice('${device.id}', ${isOn})" style="cursor:pointer">
+                        <span class="badge bg-dark border border-secondary">${device.type}</span>
+                        <i class="bi bi-circle-fill ${isOn ? 'text-success' : 'text-danger'}"></i>
                     </div>
-                    
-                    <div class="device-icon mb-3">
-                        <i class="bi ${device.icon}"></i>
+                    <div class="device-icon mb-2 text-center" onclick="toggleDevice('${device.id}', ${isOn})" style="cursor:pointer">
+                        <i class="bi ${device.icon} fs-1"></i>
                     </div>
-                    
-                    <h4 class="text-white">${device.name}</h4>
-                    <p class="${statusColor} fw-bold mb-0">${statusText}</p>
+                    <h4 class="text-white text-center">${device.name}</h4>
+                    <p class="${isOn ? 'text-success' : 'text-muted'} fw-bold mb-0 text-center">${isOn ? 'ENCENDIDO' : 'APAGADO'}</p>
+                    ${volumeHtml}
                 </div>
             </div>
         `;
-        container.innerHTML += cardHtml;
     });
 }
 
-// Función principal: Cambiar estado
 async function toggleDevice(id, currentStatus) {
-    const newStatus = !currentStatus; // Invertir estado
-    const valueForHistory = newStatus ? 1 : 0; // 1 para gráfica alta, 0 para baja
-
+    const newStatus = !currentStatus;
     try {
-        // 1. Actualizar el estado visualmente INMEDIATAMENTE (Optimistic UI) para que se sienta rápido
-        // (Opcional: aquí podrías agregar un loading, pero recargaremos todo al final)
-
-        // 2. Actualizar base de datos de DISPOSITIVOS (PUT)
         await fetch(`${API_URL}/devices/${id}`, {
             method: 'PUT',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ status: newStatus })
         });
-
-        // 3. Guardar en el HISTORIAL para la gráfica (POST a telemetry)
-        // OJO: Esto es vital para tu requisito de monitoreo
         await fetch(`${API_URL}/telemetry`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                deviceId: id,
-                value: valueForHistory
-                // createdAt lo pone MockAPI automático
-            })
+            body: JSON.stringify({ deviceId: id, value: newStatus ? 1 : 0, type: 'status' })
         });
-
-        // 4. Recargar interfaz para confirmar cambios
         loadDevices();
+    } catch (error) { console.error(error); }
+}
 
-    } catch (error) {
-        alert("Error de conexión con el dispositivo");
-        console.error(error);
-    }
+async function changeVolume(id, newVolume) {
+    document.getElementById(`vol-${id}`).innerText = newVolume;
+    try {
+        await fetch(`${API_URL}/devices/${id}`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ volume: newVolume })
+        });
+        await fetch(`${API_URL}/telemetry`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ deviceId: id, value: newVolume, type: 'volume' })
+        });
+    } catch (error) { console.error(error); }
 }
