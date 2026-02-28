@@ -166,7 +166,7 @@ function renderTableGrouped(devices, telemetry) {
     if (!tbody) return;
     
     if (devices.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Sin datos disponibles</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">Sin datos disponibles</td></tr>';
         return;
     }
 
@@ -187,7 +187,7 @@ function renderTableGrouped(devices, telemetry) {
     // Ordenar del más nuevo al más viejo
     allLogs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     
-    // Mostrar hasta 100 eventos (antes solo 10)
+    // Mostrar hasta 100 eventos
     const recentLogs = allLogs.slice(0, 100); 
     
     let html = '';
@@ -195,12 +195,6 @@ function renderTableGrouped(devices, telemetry) {
         const isVol = (log.type === 'volume');
         const isON = (log.value == 1);
         
-        let timeString = 'Fecha desconocida';
-        if (log.createdAt) {
-            const d = new Date(log.createdAt);
-            if (!isNaN(d.getTime())) timeString = d.toLocaleString();
-        }
-
         let eventHtml = isVol 
             ? '<span class="text-warning"><i class="bi bi-volume-up"></i> Volumen</span>' 
             : '<span class="text-info"><i class="bi bi-power"></i> Energía</span>';
@@ -209,9 +203,9 @@ function renderTableGrouped(devices, telemetry) {
             ? `<span class="badge bg-dark border border-warning text-warning">${log.value}%</span>`
             : (isON ? '<span class="badge bg-success">ON</span>' : '<span class="badge bg-secondary">OFF</span>');
 
+        // Cambié a 3 columnas (colspan="3" si no hay datos)
         html += `
             <tr>
-                <td class="text-muted small">${timeString}</td>
                 <td class="text-start"><i class="bi ${log.deviceIcon} text-neon me-2"></i> ${log.deviceName}</td>
                 <td>${eventHtml}</td>
                 <td>${valueHtml}</td>
