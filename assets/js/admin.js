@@ -1,13 +1,23 @@
 // js/admin.js
 
-// Al cargar la página, obtenemos los dispositivos
+// Inicializar toast
+const toastEl = document.getElementById('liveToast');
+const toast = new bootstrap.Toast(toastEl, { delay: 3000 });
+
+// Función para mostrar notificaciones
+function showToast(title, message) {
+    document.getElementById('toastTitle').innerText = title;
+    document.getElementById('toastBody').innerText = message;
+    toast.show();
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     fetchDevices();
 });
 
 const myModal = new bootstrap.Modal(document.getElementById('deviceModal'));
 
-// 1. READ (Leer dispositivos)
+// 1. READ
 async function fetchDevices() {
     try {
         const res = await fetch(`${API_URL}/devices`);
@@ -15,19 +25,31 @@ async function fetchDevices() {
         const devices = await res.json();
         renderTable(devices);
     } catch (error) {
-        alert("Error al cargar dispositivos: " + error);
+        showToast("Error", "No se pudieron cargar los dispositivos");
     }
 }
 
 function renderTable(devices) {
     const tbody = document.getElementById('deviceTableBody');
     tbody.innerHTML = '';
-    
+
+    if (devices.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5" class="text-center text-muted py-4">
+                    <i class="bi bi-emoji-frown fs-1 d-block mb-2"></i>
+                    No hay dispositivos registrados. ¡Añade uno!
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
     devices.forEach(device => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td><i class="bi ${device.icon} fs-4"></i></td>
-            <td class="fw-bold">${device.name}</td>
+            <td><i class="bi ${device.icon} fs-4 text-neon"></i></td>
+            <td class="fw-bold text-white">${device.name}</td>
             <td><span class="badge bg-secondary">${device.type}</span></td>
             <td>${device.status ? '<span class="text-success">ON</span>' : '<span class="text-danger">OFF</span>'}</td>
             <td>
@@ -39,7 +61,7 @@ function renderTable(devices) {
     });
 }
 
-// 2. Preparar Modal (Abrir para crear o editar)
+// 2. Modal
 function openModal() {
     document.getElementById('deviceForm').reset();
     document.getElementById('deviceId').value = '';
@@ -60,52 +82,56 @@ async function editDevice(id) {
         document.getElementById('modalTitle').innerText = 'Editar Dispositivo';
         myModal.show();
     } catch (error) {
-        console.error(error);
+        showToast("Error", "No se pudo cargar el dispositivo");
     }
 }
 
-// 3. CREATE & UPDATE (Guardar)
+// 3. CREATE & UPDATE
 async function saveDevice() {
     const id = document.getElementById('deviceId').value;
     const data = {
         name: document.getElementById('name').value,
         type: document.getElementById('type').value,
         icon: document.getElementById('icon').value,
-        // Si es nuevo, status por defecto false. Si es edit, no tocamos el status aquí.
         ...(id === '' && { status: false }) 
     };
 
     try {
         if (id === '') {
-            // POST (Crear)
             await fetch(`${API_URL}/devices`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(data)
             });
+            showToast("Éxito", "Dispositivo creado correctamente");
         } else {
-            // PUT (Actualizar)
             await fetch(`${API_URL}/devices/${id}`, {
                 method: 'PUT',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(data)
             });
+            showToast("Éxito", "Dispositivo actualizado correctamente");
         }
+        
         myModal.hide();
-        fetchDevices(); // Recargar tabla
+        
+        // Recargar la tabla
+        fetchDevices();
+        
     } catch (error) {
-        alert("Error al guardar: " + error);
+        showToast("Error", "No se pudo guardar el dispositivo");
     }
 }
 
-// 4. DELETE (Borrar)
+// 4. DELETE
 async function deleteDevice(id) {
     if(!confirm('¿Estás seguro de eliminar este dispositivo?')) return;
     
     try {
         await fetch(`${API_URL}/devices/${id}`, { method: 'DELETE' });
+        showToast("Eliminado", "Dispositivo borrado correctamente");
         fetchDevices();
     } catch (error) {
-        alert("Error al eliminar");
+        showToast("Error", "No se pudo eliminar");
     }
 }

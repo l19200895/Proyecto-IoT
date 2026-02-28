@@ -7,39 +7,54 @@
     <link rel="icon" type="image/x-icon" href="assets/img/favicon.ico">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <!-- Enlazamos el CSS global para que coja el estilo oscuro -->
+    <link rel="stylesheet" href="assets/css/styles.css">
 </head>
-<body class="bg-light"><body class="bg-dark text-white">
+<!-- BODY CORREGIDO: Un solo body con las clases correctas -->
+<body class="bg-dark text-white">
 
-
-    <nav class="navbar navbar-expand-lg navbar-dark mb-4 sticky-top" style="background-color: #16162a; box-shadow: 0 4px 10px rgba(0,0,0,0.2);">
-    <div class="container">
-        <a class="navbar-brand fw-bold" href="index.html">
-            <i class="bi bi-house-heart-fill"></i> Smart<span class="text-neon">Home</span>
-        </a>
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-        <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
-            <ul class="navbar-nav gap-2">
-                <li class="nav-item"><a class="nav-link btn-glass-nav" href="index.html">Inicio</a></li>
-                <li class="nav-item"><a class="nav-link btn-glass-nav" href="control.html">Control</a></li>
-                <li class="nav-item"><a class="nav-link btn-glass-nav" href="monitor.html">Monitor</a></li>
-            </ul>
+    <!-- Contenedor de Toasts (Notificaciones) -->
+    <div class="position-fixed top-0 end-0 p-3" style="z-index: 1100;">
+        <div id="liveToast" class="toast hide" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="toast-header bg-dark text-white border-secondary">
+                <strong class="me-auto" id="toastTitle">Título</strong>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+            <div class="toast-body bg-dark-subtle text-white" id="toastBody">
+                Mensaje...
+            </div>
         </div>
     </div>
-</nav>
+
+    <nav class="navbar navbar-expand-lg navbar-dark mb-4 sticky-top glass-nav">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="index.html">
+                <i class="bi bi-house-heart-fill"></i> Smart<span class="text-neon">Home</span>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
+                <ul class="navbar-nav gap-2">
+                    <li class="nav-item"><a class="nav-link btn-glass-nav" href="index.html">Inicio</a></li>
+                    <li class="nav-item"><a class="nav-link btn-glass-nav" href="control.html">Control</a></li>
+                    <li class="nav-item"><a class="nav-link btn-glass-nav" href="monitor.html">Monitor</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
 
     <div class="container">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h2>Mis Dispositivos</h2>
-            <button class="btn btn-success" onclick="openModal()">
+            <button class="btn btn-primary" onclick="openModal()">
                 <i class="bi bi-plus-circle"></i> Nuevo Dispositivo
             </button>
         </div>
 
-        <div class="card shadow-sm">
+        <div class="card shadow-sm glass-card"> <!-- Añadido glass-card para que combine -->
             <div class="card-body p-0">
-                <table class="table table-hover mb-0">
+                <table class="table table-dark table-hover mb-0"> <!-- table-dark para contraste -->
                     <thead class="table-light">
                         <tr>
                             <th>Icono</th>
@@ -50,18 +65,20 @@
                         </tr>
                     </thead>
                     <tbody id="deviceTableBody">
-                        </tbody>
+                        <!-- Aquí se cargan los datos -->
+                    </tbody>
                 </table>
             </div>
         </div>
     </div>
 
+    <!-- MODAL -->
     <div class="modal fade" id="deviceModal" tabindex="-1">
         <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
+            <div class="modal-content bg-dark text-white"> <!-- Modal oscuro -->
+                <div class="modal-header border-secondary">
                     <h5 class="modal-title" id="modalTitle">Nuevo Dispositivo</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <form id="deviceForm">
@@ -80,16 +97,24 @@
                             </select>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">Icono (Bootstrap Icons)</label>
-                            <div class="input-group">
-                                <span class="input-group-text"><i class="bi bi-box"></i></span>
-                                <input type="text" class="form-control" id="icon" placeholder="Ej: bi-tv, bi-laptop, bi-lightbulb" required>
-                            </div>
-                            <div class="form-text">Busca nombres en la web de Bootstrap Icons.</div>
+                            <label class="form-label">Icono (Seleccionar)</label>
+                            <!-- CAMBIO CLAVE: SELECT EN LUGAR DE INPUT TEXTO -->
+                            <select class="form-select" id="icon" required>
+                                <option value="bi-tv">📺 TV</option>
+                                <option value="bi-laptop">💻 Laptop</option>
+                                <option value="bi-lightbulb">💡 Foco</option>
+                                <option value="bi-fan">❄️ Ventilador</option>
+                                <option value="bi-phone">Celular </option>
+                                <option value="bi-thermometer">🌡️ Termostato</option>
+                                <option value="bi-lock">🔒 Cerradura</option>
+                                <option value="bi-speaker">🔊 Altavoz</option>
+                                <option value="bi-router">📡 Router</option>
+                                <option value="bi-camera">📷 Cámara</option>
+                            </select>
                         </div>
                     </form>
                 </div>
-                <div class="modal-footer">
+                <div class="modal-footer border-secondary">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                     <button type="button" class="btn btn-primary" onclick="saveDevice()">Guardar</button>
                 </div>
